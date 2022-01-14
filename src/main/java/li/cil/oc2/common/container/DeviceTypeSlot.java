@@ -3,22 +3,29 @@ package li.cil.oc2.common.container;
 import com.mojang.datafixers.util.Pair;
 import li.cil.oc2.api.bus.device.DeviceType;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.Container;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.SlotItemHandler;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
-public final class TypedSlotItemHandler extends SlotItemHandler {
+public final class DeviceTypeSlot extends Slot {
     private final DeviceType deviceType;
 
-    public TypedSlotItemHandler(final IItemHandler itemHandler, final DeviceType deviceType, final int index, final int xPosition, final int yPosition) {
-        super(itemHandler, index, xPosition, yPosition);
+    public DeviceTypeSlot(final Container container, final DeviceType deviceType, final int index, final int x, final int y) {
+        super(container, index, x, y);
         this.deviceType = deviceType;
     }
 
     public DeviceType getDeviceType() {
         return deviceType;
+    }
+
+    @Override
+    public boolean mayPlace(@NotNull final ItemStack stack) {
+        return super.mayPlace(stack) && stack.is(deviceType.getTag());
     }
 
     @Nullable

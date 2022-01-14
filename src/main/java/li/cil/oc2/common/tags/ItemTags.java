@@ -5,6 +5,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.Tags;
 
+import static net.minecraft.tags.ItemTags.createOptional;
+
 public final class ItemTags {
     public static final Tags.IOptionalNamedTag<Item> DEVICES = tag("devices");
     public static final Tags.IOptionalNamedTag<Item> DEVICES_MEMORY = tag("devices/memory");
@@ -13,6 +15,7 @@ public final class ItemTags {
     public static final Tags.IOptionalNamedTag<Item> DEVICES_CARD = tag("devices/card");
     public static final Tags.IOptionalNamedTag<Item> DEVICES_ROBOT_MODULE = tag("devices/robot_module");
     public static final Tags.IOptionalNamedTag<Item> DEVICES_FLOPPY = tag("devices/floppy");
+    public static final Tags.IOptionalNamedTag<Item> DEVICES_NETWORK_TUNNEL = tag("devices/network_tunnel");
 
     public static final Tags.IOptionalNamedTag<Item> CABLES = tag("cables");
     public static final Tags.IOptionalNamedTag<Item> WRENCHES = tag("wrenches");
@@ -26,6 +29,6 @@ public final class ItemTags {
     ///////////////////////////////////////////////////////////////////
 
     private static Tags.IOptionalNamedTag<Item> tag(final String name) {
-        return net.minecraft.tags.ItemTags.createOptional(new ResourceLocation(API.MOD_ID, name));
+        return createOptional(new ResourceLocation(API.MOD_ID, name));
     }
 }

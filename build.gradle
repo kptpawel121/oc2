@@ -58,12 +58,12 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    implementation "li.cil.sedna:sedna-${minecraft_version}-forge:1.0.5"
+    implementation "li.cil.sedna:sedna-${minecraft_version}-forge:1.0.9"
 
     implementation fg.deobf("curse.maven:markdownmanual-502485:3565800")
 
     // Just for in-dev convenience. Mod doesn't use any JEI APIs.
-    implementation fg.deobf("curse.maven:jei-238222:3564650")
+    implementation fg.deobf("curse.maven:jei-238222:3603923")
 
     testImplementation 'org.mockito:mockito-core:4.2.0'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
