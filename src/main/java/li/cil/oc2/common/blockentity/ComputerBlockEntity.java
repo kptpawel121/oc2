@@ -163,7 +163,7 @@ public final class ComputerBlockEntity extends ModBlockEntity implements Termina
         return LazyOptional.empty();
     }
 
-    public static void tick(final Level level, final BlockPos pos, final BlockState state, final ComputerBlockEntity computer) {
+    public static void tick(final Level level, final BlockPos ignoredPos, final BlockState ignoredState, final ComputerBlockEntity computer) {
         if (level.isClientSide()) {
             computer.clientTick();
         } else {
@@ -193,16 +193,6 @@ public final class ComputerBlockEntity extends ModBlockEntity implements Termina
         }
 
         virtualMachine.tick();
-    }
-
-    @Override
-    public void setRemoved() {
-        super.setRemoved();
-
-        // super.remove() calls onUnload. This in turn only suspends, but we want to do
-        // a full clean-up when we get destroyed, so stuff inside us can delete out-of-nbt
-        // persisted runtime-only data such as ram.
-        virtualMachine.state.vmAdapter.unmount();
     }
 
     @Override
@@ -285,10 +275,16 @@ public final class ComputerBlockEntity extends ModBlockEntity implements Termina
     }
 
     @Override
-    protected void unloadServer() {
-        super.unloadServer();
+    protected void unloadServer(final boolean isRemove) {
+        super.unloadServer(isRemove);
 
-        virtualMachine.suspend();
+        if (isRemove) {
+            virtualMachine.stop();
+        } else {
+            virtualMachine.suspend();
+        }
+
+        virtualMachine.dispose();
 
         // This is necessary in case some other controller found us before our controller
         // did its scan, which can happen because the scan can happen with a delay. In
@@ -457,7 +453,7 @@ public final class ComputerBlockEntity extends ModBlockEntity implements Termina
 
         @Override
         protected void handleBusStateChanged(final CommonDeviceBusController.BusState value) {
-            Network.sendToClientsTrackingChunk(new ComputerBusStateMessage(ComputerBlockEntity.this), chunk);
+            Network.sendToClientsTrackingChunk(new ComputerBusStateMessage(ComputerBlockEntity.this, value), chunk);
 
             if (value == CommonDeviceBusController.BusState.READY && level != null) {
                 // Bus just became ready, meaning new devices may be available, meaning new
@@ -471,13 +467,13 @@ public final class ComputerBlockEntity extends ModBlockEntity implements Termina
             // This method can be called from disposal logic, so if we are disposed quickly enough
             // chunk may not be initialized yet. Avoid resulting NRE in network logic.
             if (chunk != null) {
-                Network.sendToClientsTrackingChunk(new ComputerRunStateMessage(ComputerBlockEntity.this), chunk);
+                Network.sendToClientsTrackingChunk(new ComputerRunStateMessage(ComputerBlockEntity.this, value), chunk);
             }
         }
 
         @Override
         protected void handleBootErrorChanged(@Nullable final Component value) {
-            Network.sendToClientsTrackingChunk(new ComputerBootErrorMessage(ComputerBlockEntity.this), chunk);
+            Network.sendToClientsTrackingChunk(new ComputerBootErrorMessage(ComputerBlockEntity.this, value), chunk);
         }
     }
 }

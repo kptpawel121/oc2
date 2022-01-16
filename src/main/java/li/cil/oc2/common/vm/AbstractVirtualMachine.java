@@ -54,7 +54,7 @@ public abstract class AbstractVirtualMachine implements VirtualMachine {
         public VMDeviceBusAdapter vmAdapter;
     }
 
-    public SerializedState state = new SerializedState();
+    public final SerializedState state = new SerializedState();
     public AbstractTerminalVMRunner runner;
     private VMRunState runState = VMRunState.STOPPED;
     @Nullable private Component bootError;
@@ -82,12 +82,16 @@ public abstract class AbstractVirtualMachine implements VirtualMachine {
 
     ///////////////////////////////////////////////////////////////////
 
+    public void dispose() {
+        joinWorkerThread();
+        state.context.invalidate();
+        busController.dispose();
+    }
+
     public void suspend() {
         joinWorkerThread();
         state.vmAdapter.suspend();
         state.rpcAdapter.suspend();
-        state.context.invalidate();
-        busController.dispose();
     }
 
     @Override
@@ -198,6 +202,7 @@ public abstract class AbstractVirtualMachine implements VirtualMachine {
 
         state.board.reset();
         state.rpcAdapter.reset();
+        state.rpcAdapter.unmount();
         state.vmAdapter.unmount();
 
         runner = null;
@@ -337,9 +342,11 @@ public abstract class AbstractVirtualMachine implements VirtualMachine {
             runner = createRunner();
         }
 
+        state.rpcAdapter.mount();
+
         setRunState(VMRunState.RUNNING);
 
-        // Only start running next tick. This gives loaded devices one tick to do async
+        // Only start running next tick. Doing so gives loaded devices one tick to do async
         // initialization. This is used by devices to restore data from disk, for example.
     }
 

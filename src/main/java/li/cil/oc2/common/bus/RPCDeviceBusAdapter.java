@@ -11,7 +11,7 @@ import li.cil.oc2.api.bus.device.rpc.RPCParameter;
 import li.cil.oc2.common.Constants;
 import li.cil.oc2.common.bus.device.rpc.RPCDeviceList;
 import li.cil.oc2.common.bus.device.rpc.RPCMethodParameterTypeAdapters;
-import li.cil.oc2.common.serialization.serializers.*;
+import li.cil.oc2.common.serialization.gson.*;
 import li.cil.sedna.api.device.Steppable;
 import li.cil.sedna.api.device.serial.SerialDevice;
 
@@ -40,6 +40,8 @@ public final class RPCDeviceBusAdapter implements Steppable {
 
     private final ArrayList<RPCDeviceWithIdentifier> devices = new ArrayList<>();
     private final HashMap<UUID, RPCDeviceList> devicesById = new HashMap<>();
+    private final Set<RPCDevice> unmountedDevices = new HashSet<>();
+    private final Set<RPCDevice> mountedDevices = new HashSet<>();
     private final Lock pauseLock = new ReentrantLock();
     private boolean isPaused;
 
@@ -68,6 +70,22 @@ public final class RPCDeviceBusAdapter implements Steppable {
     }
 
     ///////////////////////////////////////////////////////////////////
+
+    public void mount() {
+        for (final RPCDevice device : unmountedDevices) {
+            device.mount();
+        }
+        mountedDevices.addAll(unmountedDevices);
+        unmountedDevices.clear();
+    }
+
+    public void unmount() {
+        for (final RPCDevice device : mountedDevices) {
+            device.unmount();
+        }
+        unmountedDevices.addAll(mountedDevices);
+        mountedDevices.clear();
+    }
 
     public void suspend() {
         for (final RPCDeviceWithIdentifier info : devices) {
@@ -100,13 +118,14 @@ public final class RPCDeviceBusAdapter implements Steppable {
 
         devices.clear();
         devicesById.clear();
+        unmountedDevices.clear();
 
         // How device grouping works:
         // Each device can have multiple UUIDs due to being attached to multiple bus elements.
         // There is no guarantee that for each device D1 present on bus elements E1 and E2,
         // where device D2 is present on E1 it will also be present on E2. This is completely
         // up to the device providers.
-        // Therefore we must group all devices by their identifiers to then remove duplicate
+        // Therefore, we must group all devices by their identifiers to then remove duplicate
         // groups. This is fragile because it will depend on the order the devices appear in
         // the list. However, since we add devices to bus elements in the order of their
         // providers, then add devices to the controller in the order of their elements, this
@@ -144,11 +163,31 @@ public final class RPCDeviceBusAdapter implements Steppable {
                 .add(identifier);
         });
 
+        final Set<RPCDevice> newDevices = new HashSet<>();
         identifiersByDevice.forEach((device, identifiers) -> {
             final UUID identifier = selectIdentifierDeterministically(identifiers);
             devices.add(new RPCDeviceWithIdentifier(identifier, device));
             devicesById.put(identifier, device);
+            newDevices.add(device);
         });
+
+        // Add new devices to list of unmounted devices. List was cleared, so removed devices previously in
+        // list of unmounted devices are already gone.
+        for (final RPCDevice newDevice : newDevices) {
+            if (!mountedDevices.contains(newDevice)) {
+                unmountedDevices.add(newDevice);
+            }
+        }
+
+        // Remove removed devices from list of mounted devices.
+        final Iterator<RPCDevice> mountedDeviceIterator = mountedDevices.iterator();
+        while (mountedDeviceIterator.hasNext()) {
+            final RPCDevice device = mountedDeviceIterator.next();
+            if (!newDevices.contains(device)) {
+                device.unmount();
+                mountedDeviceIterator.remove();
+            }
+        }
     }
 
     public void tick() {
@@ -161,7 +200,7 @@ public final class RPCDeviceBusAdapter implements Steppable {
             processMethodInvocation(methodInvocation, true);
 
             // This is also used to prevent thread from processing messages, so only
-            // reset this when we're done. Otherwise we may get a race-condition when
+            // reset this when we're done. Otherwise, we may get a race-condition when
             // writing back data.
             synchronizedInvocation = null;
         }
@@ -415,17 +454,9 @@ public final class RPCDeviceBusAdapter implements Steppable {
 
     ///////////////////////////////////////////////////////////////////
 
-    public static final class RPCDeviceWithIdentifier {
-        public final UUID identifier;
-        public final RPCDevice device;
+    public record RPCDeviceWithIdentifier(UUID identifier, RPCDevice device) { }
 
-        private RPCDeviceWithIdentifier(final UUID identifier, final RPCDevice device) {
-            this.identifier = identifier;
-            this.device = device;
-        }
-    }
-
-    public static final class Message {
+    public record Message(String type, @Nullable Object data) {
         // Device -> VM
         public static final String MESSAGE_TYPE_LIST = "list";
         public static final String MESSAGE_TYPE_METHODS = "methods";
@@ -434,14 +465,6 @@ public final class RPCDeviceBusAdapter implements Steppable {
 
         // VM -> Device
         public static final String MESSAGE_TYPE_INVOKE_METHOD = "invoke";
-
-        public final String type;
-        @Nullable public final Object data;
-
-        public Message(final String type, @Nullable final Object data) {
-            this.type = type;
-            this.data = data;
-        }
     }
 
     @Serialized
